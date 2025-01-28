@@ -6,7 +6,11 @@
 项目用streamlit编写界面
 
 文件**main.py**：streamlit界面代码
+
 文件**gpt_api.py**：调用API接口并导入操作表格的函数
+
 文件**xl_class.py**：表格操作相关函数
+
 文件**gpt_data.py**：数据分析AI
+
 文件**chart.py**：绘制统计图函数
