@@ -14,3 +14,7 @@
 文件**gpt_data.py**：数据分析AI
 
 文件**chart.py**：绘制统计图函数
+
+文件**requirements.txt**：所需要的python依赖库
+
+运行代码 `pip install -r requirements.txt` 即可安装所有所需依赖。
