@@ -1,6 +1,8 @@
 # AI_excel
 这是一个可以自动操作Excel的AI工具
 
+软件效果视频：[只说人话就可以做表格了！我造了一个自动操作Excel表的网站](https://www.bilibili.com/video/BV1sJFpebEWa/?share_source=copy_web&vd_source=daff82a5486ca8fb08383c0e69582854)
+
 本项目调用大语言模型的API接口，并让模型能够调用操作Excel表文件的函数
 
 项目用streamlit编写界面
