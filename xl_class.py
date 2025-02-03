@@ -2,7 +2,6 @@ import pandas as pd
 import time
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import NamedStyle
-import os
 from datetime import datetime, timedelta
 import shutil
 import openpyxl
@@ -188,6 +187,16 @@ def copy_first_sheet_to_all_sheets(src_file_path, dest_file_path, sheet_i=0):
     dest_file_path (str): 目标Excel文件路径。
     sheet_i (int): 要复制的源工作表的索引，默认为0（第一个工作表）。
     """
+
+    # 判断文件是否存在
+    exist_src = os.path.exists(src_file_path)
+    exist_dest = os.path.exists(dest_file_path)
+    if exist_src and exist_dest:
+        pass
+    else:
+        print("文件不存在")
+        return
+
     # 加载源和目标工作簿
     src_wb = load_workbook(src_file_path)
     dest_wb = load_workbook(dest_file_path)
@@ -350,8 +359,8 @@ def copy_and_rename_excel_files(file_path, num_copies=1, time_list=[], split_y="
     """
     复制指定数量的Excel文件，并默认复制一个文件，可以自定义文件的数量和是否以时间为后缀
     参数:
-    source_file_path (str): 源Excel文件路径。
-    num_copies (int): 要复制的文件数量，默认为10。
+    file_path (str): 源Excel文件路径。
+    num_copies (int): 要复制的文件数量，默认为1。
     """
     try:
         # 确保源文件存在
@@ -456,6 +465,16 @@ def excel_cells_to_list(src_file_path, dest_file_path, cell_range, sheet=0, cell
     sheet (int or str): 工作表的索引或名称，默认为第一个工作表。
     cell (str): 目标文件中要修改的单元格地址，例如 'E10'。
     """
+
+    # 判断文件是否存在
+    exist_src = os.path.exists(src_file_path)
+    exist_dest = os.path.exists(dest_file_path)
+    if exist_src and exist_dest:
+        pass
+    else:
+        print("文件不存在")
+        return
+
     # 加载源Excel文件
     workbook = openpyxl.load_workbook(src_file_path, data_only=True)
 
@@ -503,7 +522,6 @@ def excel_cells_to_list(src_file_path, dest_file_path, cell_range, sheet=0, cell
 def format_excel_cell(workbook, cell_address, sheet_i, alignment=None, width=None, height=None):
     """
     更改Excel文件中指定单元格的格式。
-
     参数:
     file_path (str): Excel文件路径。
     cell_address (str): 单元格地址，例如 'A1'。
@@ -545,7 +563,6 @@ def format_excel_cell(workbook, cell_address, sheet_i, alignment=None, width=Non
 def format_excel_cell_range(file_path, cell_address, sheet_id=[0], alignment=None, width=None, height=None):
     """
     更改Excel文件中指定工作表的指定单元格的格式。
-
     参数:
     file_path (str): Excel文件路径。
     cell_address (str): 单元格地址，例如 'A1'。

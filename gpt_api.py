@@ -4,15 +4,18 @@ from xl_class import *
 import json
 import re
 
-base_url = 'XXX'
-api_key = 'XXX'
-client = OpenAI(base_url=base_url, api_key=api_key)
-
 file_path = 'C:/files/python_files/gpt_excel/入库单.xlsx'
 
-def llm_model(content):
+def llm_model(content, model=None, API_key=None):
+    if model is None:
+        model = "GLM-4-Air"
+    else:
+        model = model
+    base_url = 'https://api.mindcraft.com.cn/v1/'
+    api_key = API_key
+    client = OpenAI(base_url=base_url, api_key=api_key)
     params = {
-        "model": "GLM-4-Air",
+        "model": model,
         "message": [
             {
                 "role": "system",
@@ -121,12 +124,12 @@ def link_llm(text, file_path):
                 except:
                     str_text = "不能执行此动作"
                     print(str_text)
-                    return str_text
+                    continue
     else:
         return text
 
-def AI_run(content):
-    response = llm_model(content)
+def AI_run(content, model, API_key):
+    response = llm_model(content, model, API_key)
     text = llm_text(response)
     return text
 

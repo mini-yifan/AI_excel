@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 from xl_class import *
 from gpt_api import AI_run, link_llm
-from gpt_data import AI_run2, llm_model2, llm_text2
+from gpt_data import llm_model2, llm_text2
 import time
 import copy
 import json
 import plotly.express as px
 import plotly.graph_objects as go
+import os
 
 
 def plot_chart(data, chart_type, x_column, y_columns=None, legend_title=None, title='Chart', xlabel=None, ylabel=None,
@@ -51,9 +52,6 @@ def plot_chart(data, chart_type, x_column, y_columns=None, legend_title=None, ti
     st.plotly_chart(fig)
 
 
-
-time_c = get_current_date()
-
 def save_list_to_txt(file_path, data_list):
     """
     将列表存入txt文件
@@ -65,10 +63,12 @@ def save_list_to_txt(file_path, data_list):
             file.write(str(item) + '\n')  # 每个元素写入一行
 
 
+# 获取当前日期
+time_c = get_current_date()
+
 # 初始化状态变量，用于存储历史回答
 if 'history' not in st.session_state:
     st.session_state.history = []
-
 
 st.title("Excel自动化AI工具")
 
@@ -77,6 +77,13 @@ col3_1, col3_2 = st.columns([16, 1])
 with col3_1:
     input_str = st.text_input("请输入你的Excel文件路径：")
     file_path = process_path_or_filename(input_str)
+    # 检查文件是否存在
+    exist_file = os.path.exists(file_path)
+    if file_path:
+        if exist_file:
+            pass
+        else:
+            st.error(f"文件 '{file_path}' 不存在！请重新输入文件路径！")
 
 with col3_2:
     if file_path:
@@ -85,7 +92,23 @@ with col3_2:
 
 tab1, tab2, tab3 = st.tabs(["AI脚本生成", "自定义脚本", "数据分析"])
 
+
 with tab1:
+    col4_1, col4_2, col4_3 = st.columns([6, 8, 2])
+    with col4_1:
+        # 定义主流大语言模型列表
+        models1 = ["GLM-4-Air", "GLM-4-Flash", "Doubao-1.5-lite-32k", "Doubao-1.5-pro-32k", "deepseek-chat", "deepseek-reasoner", "deepseek-coder", "qwen-turbo-latest", "qwen-plus-latest", "qwen-coder-plus-latest"]
+        # 创建下拉列表，默认选择 DeepSeek
+        selected_model = st.selectbox(
+            "选择一个大语言模型",
+            models1,
+            index=models1.index("GLM-4-Air")  # 设置默认选项为 DeepSeek
+        )
+    with col4_2:
+        API_key_1 = st.text_input("输入API密钥", type="password")
+    with col4_3:
+        st.markdown("[如何获得API密钥](https://apifox.com/apidoc/shared-0fd7ea54-919e-4c93-b673-c60219bc82e0/doc-4739665)", )
+
     query = st.text_area("请输入关于你上传文件路径下对该文件的文件的指令，或关于上传文件的需求：")
 
     col1_1, col1_2 = st.columns([1, 2])
@@ -99,17 +122,28 @@ with tab1:
             st.error("请先输入文件路径")
         elif not query:
             st.error("请输入指令或需求")
+        elif not exist_file:
+            st.error("文件不存在，请重新输入文件路径")
+        elif not API_key_1:
+            st.error("请输入API密钥")
         else:
             with st.spinner("AI思考中，请稍等..."):
+                time_tab_1_1 = time.time()
                 if checked:
                     copy_excel_with_pandas(file_path)
-                text = AI_run(query)
-                resp = link_llm(text, file_path)
-                st.write(text)
-                st.write(resp)
-                # 将生成的回答插入到历史记录的开头
-                st.session_state.history.insert(0, text)
-
+                try:
+                    text = AI_run(query, model=selected_model, API_key=API_key_1)
+                    resp = link_llm(text, file_path)
+                    st.write(text)
+                    if resp!=text:
+                        st.write(resp)
+                    # 将生成的回答插入到历史记录的开头
+                    st.session_state.history.insert(0, text)
+                except:
+                    print("程序出错。")
+                    st.error("AI执行出错")
+                time_tab_1_2 = time.time()
+                st.write("请求用时：", time_tab_1_2-time_tab_1_1, "秒")
 
 # 在侧边栏显示历史回答
 with st.sidebar:
@@ -118,7 +152,7 @@ with st.sidebar:
     len_list = list(range(1, len_history+1))
     len_list.reverse()
     for i, answer in enumerate(st.session_state.history):
-        with st.expander(f"回答 {len_list[i]}", expanded=False):
+        with st.expander(f"脚本 {len_list[i]}", expanded=False):
             st.write(answer)
 
 
@@ -137,17 +171,21 @@ with tab2:
             st.write(str(lines))
 
         if button_run1:
-            # 按行分割文件内容
             if not file_path:
                 st.error("请先输入文件路径")
+            elif not exist_file:
+                st.error("文件不存在，请重新输入文件路径")
             else:
                 with st.spinner("正在执行脚本，请稍等..."):
-                    time.sleep(2)
+                    time_tab_2_1 = time.time()
+                    time.sleep(1)
                     try:
                         link_llm(lines, file_path)
                         st.write("脚本执行完毕 ", time_c)
                     except:
                         st.error("脚本执行出错")
+                    time_tab_2_2 = time.time()
+                    st.write("用时", time_tab_2_2-time_tab_2_1, "秒")
 
 
     st.divider()
@@ -205,6 +243,21 @@ def link_llm2(text):
 
 # 数据分析Tab
 with tab3:
+    col5_1, col5_2, col5_3 = st.columns([6, 8, 2])
+    with col5_1:
+        # 定义主流大语言模型列表
+        models2 = ["abab7-chat-preview", "deepseek-coder", "deepseek-chat", "deepseek-reasoner", "qwen-max-latest", "GLM-4-Flash", "GLM-4-Plus", "Doubao-1.5-pro-256k"]
+        # 创建下拉列表，默认选择 DeepSeek
+        selected_model = st.selectbox(
+            "选择一个数据分析大语言模型",
+            models2,
+            index=models2.index("abab7-chat-preview")  # 设置默认选项为 DeepSeek
+        )
+    with col5_2:
+        API_key_2 = st.text_input("输入数据分析大语言模型API密钥", type="password")
+    with col5_3:
+        st.markdown("[怎样获得API密钥](https://apifox.com/apidoc/shared-0fd7ea54-919e-4c93-b673-c60219bc82e0/doc-4739665)", )
+
     data = st.file_uploader("上传你的Excel文件（xlsx格式）：", type="xlsx")
     if data:
         st.session_state["df"] = pd.read_excel(data)
@@ -224,14 +277,23 @@ with tab3:
             st.error("请先上传文件")
         elif not query2:
             st.error("请输入指令或需求")
+        elif not API_key_2:
+            st.error("请输入API密钥")
         else:
             with st.spinner("AI思考中，请稍等..."):
-                respose2 = llm_model2(text_2)
-                #respose2 = AI_run2(text_2)
-                text_t = llm_text2(respose2)
-                st.write(text_t)
-                respose3 = link_llm2(text_t)
-                if respose3 != text_t:
-                    st.write(respose3)
+                time_tab_3_1 = time.time()
+                try:
+                    respose2 = llm_model2(text_2, selected_model, API_key_2)
+                    #respose2 = AI_run2(text_2)
+                    text_t = llm_text2(respose2)
+                    st.write(text_t)
+                    respose3 = link_llm2(text_t)
+                    if respose3 != text_t:
+                        st.write(respose3)
+                except:
+                    print("程序出错。")
+                    st.error("程序出错。")
+                time_tab_3_2 = time.time()
+                st.write("请求用时：", time_tab_3_2-time_tab_3_1, "秒")
 
 
