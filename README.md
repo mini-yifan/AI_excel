@@ -19,4 +19,5 @@
 
 文件**requirements.txt**：所需要的python依赖库
 
-运行代码 `pip install -r requirements.txt` 即可安装所有所需依赖。
+运行命令 `pip install -r requirements.txt` 即可安装所有所需依赖。
+运行命令 `streamlit run main.py` 即可运行网站程序
