@@ -8,7 +8,7 @@ import openpyxl
 import re
 import os
 from openpyxl.styles import Alignment
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import get_column_letter, column_index_from_string
 
 
 # 获取当前日期年月日时分秒
@@ -660,9 +660,176 @@ def process_path_or_filename(input_str):
         print("Converted to Python-friendly path format.")
     return input_str
 
+def write_df_to_excel(output_filename, df):
+    """
+    将给定的DataFrame写入到指定的Excel文件中。
+    参数:
+    df (pd.DataFrame): 要写入Excel文件的pandas DataFrame。
+    output_filename (str): 输出的Excel文件名，包括路径。
+    """
+    try:
+        df.to_excel(output_filename, index=False)
+        print(f"文件成功写入到文件: {output_filename}")
+    except Exception as e:
+        print(f"写入文件时出错: {e}")
+
+
+def process_excel_files(file_list, keyword=None, cell_position=None, operation='read', direction=None, num_of_cells=1,
+                        output_file='output_m.xlsx', extract_formula=False, transpose=False):
+    """
+        处理给定的Excel文件列表，查找包含特定关键字或指定位置的单元格，并对其周围的单元格或自身进行操作。
+        :param file_list: 包含Excel文件路径的列表
+        :param keyword: 查找的关键字（可选）
+        :param cell_position: 单元格位置，如'A1'（可选）
+        :param operation: 'read' 表示读取周围单元格，'modify' 表示修改当前单元格
+        :param direction: 要提取的内容方向，可以是'up', 'down', 'left', 'right'
+        :param num_of_cells: 提取多少个相邻单元格（仅当operation为'read'时有效）
+        :param output_file: 输出结果的Excel文件名
+        :param extract_formula: 是否提取单元格中的公式，默认为False
+        :param transpose: 是否要将提取到的数据进行转置，默认为False
+    """
+    all_results = []
+    all_data = []
+
+    for file in file_list:
+        wb = load_workbook(filename=file, data_only=not extract_formula)  # 如果不提取公式，则data_only=True
+
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+
+            if cell_position and not direction:  # 当提供了单元格位置但未提供方向时
+                col, row = column_index_from_string(cell_position[0]), int(cell_position[1:])
+                cell = ws.cell(row=row, column=col)
+
+                result = {'File': file, 'Sheet': sheet_name, 'Keyword Position': cell_position}
+                extracted_data = [cell.value if not extract_formula else cell.formula]
+                all_data.append(extracted_data)
+                all_results.append(result)
+
+            elif cell_position and direction:  # 当提供了单元格位置和方向时
+                col, row = column_index_from_string(cell_position[0]), int(cell_position[1:])
+                cell = ws.cell(row=row, column=col)
+
+                result = {'File': file, 'Sheet': sheet_name, 'Keyword Position': cell_position}
+                extracted_data = []
+                if direction == 'right':
+                    for i in range(1, num_of_cells + 1):
+                        target_cell = ws.cell(row=row, column=col + i)
+                        if target_cell:
+                            extracted_data.append(target_cell.value if not extract_formula else target_cell.formula)
+                elif direction == 'left':
+                    for i in range(num_of_cells):
+                        target_cell = ws.cell(row=row, column=col - i - 1)
+                        if target_cell:
+                            extracted_data.append(target_cell.value if not extract_formula else target_cell.formula)
+                elif direction == 'up':
+                    for i in range(num_of_cells):
+                        target_cell = ws.cell(row=row - i - 1, column=col)
+                        if target_cell:
+                            extracted_data.append(target_cell.value if not extract_formula else target_cell.formula)
+                elif direction == 'down':
+                    for i in range(1, num_of_cells + 1):
+                        target_cell = ws.cell(row=row + i, column=col)
+                        if target_cell:
+                            extracted_data.append(target_cell.value if not extract_formula else target_cell.formula)
+                all_data.append(extracted_data)
+                all_results.append(result)
+
+            elif keyword:
+                for row in ws.iter_rows():
+                    for cell in row:
+                        if str(cell.value) == keyword:
+                            result = {'File': file, 'Sheet': sheet_name,
+                                      'Keyword Position': f'{cell.row}, {cell.column}'}
+
+                            if operation == 'read':
+                                extracted_data = []
+                                if direction == 'right':
+                                    for i in range(1, num_of_cells + 1):
+                                        target_cell = ws.cell(row=cell.row, column=cell.column + i)
+                                        if target_cell:
+                                            extracted_data.append(
+                                                target_cell.value if not extract_formula else target_cell.formula)
+                                elif direction == 'left':
+                                    for i in range(num_of_cells):
+                                        target_cell = ws.cell(row=cell.row, column=cell.column - i - 1)
+                                        if target_cell:
+                                            extracted_data.append(
+                                                target_cell.value if not extract_formula else target_cell.formula)
+                                elif direction == 'up':
+                                    for i in range(num_of_cells):
+                                        target_cell = ws.cell(row=cell.row - i - 1, column=cell.column)
+                                        if target_cell:
+                                            extracted_data.append(
+                                                target_cell.value if not extract_formula else target_cell.formula)
+                                elif direction == 'down':
+                                    for i in range(1, num_of_cells + 1):
+                                        target_cell = ws.cell(row=cell.row + i, column=cell.column)
+                                        if target_cell:
+                                            extracted_data.append(
+                                                target_cell.value if not extract_formula else target_cell.formula)
+                                all_data.append(extracted_data)
+
+                            elif operation == 'modify':
+                                cell.value = "Modified"
+                                result['Modification'] = "Cell value modified."
+
+                            all_results.append(result)
+
+            if operation == 'modify':
+                wb.save(file)
+
+    # 将所有结果保存到新的Excel文件中
+    df_results = pd.DataFrame(all_results)
+    df_data = pd.DataFrame(all_data)
+    print(df_data)
+    # 将列的索引改为从 1 开始
+    df_data.columns = range(1, len(df_data.columns) + 1)
+
+    # 将两个DataFrame合并
+    df_results = pd.concat([df_results, df_data], axis=1)
+
+    if transpose:
+        df_results = df_results.T
+        df_data = df_data.T
+
+    print(df_results)
+    print(df_data)
+
+    # 尝试将 DataFrame 的内容转换为 double 类型
+    try:
+        # 使用 astype() 将 DataFrame 转换为 float64 类型
+        df_data = df_data.astype(float)
+    except ValueError as e:
+        # 如果转换失败，捕获异常并提示
+        print(f"转换失败: {e}")
+        print("请检查数据中是否包含非数值型数据。")
+
+    # 计算每一列的和
+    sum_row = df_data.sum(numeric_only=True).rename('总和')
+
+    df_data_describe = df_data.describe()
+    # 将求和结果添加到描述性统计的最后一行
+    df_data_describe = df_data_describe._append(sum_row)
+    print(df_data_describe)
+
+    time_1 = get_current_date()
+
+    # 判断output_file是否存在
+    if os.path.exists(output_file):
+        print("文件已存在，将覆盖")
+        made = 'a'
+    else:
+        print("文件不存在，将创建")
+        made = 'w'
+
+    with pd.ExcelWriter(output_file, engine='openpyxl', mode=made) as writer:
+        df_results.to_excel(writer, index=False, sheet_name='相关数据' + str(time_1))
+        df_data_describe.to_excel(writer, index=True, sheet_name='汇总结果' + str(time_1))
 
 
 if __name__ == '__main__':
+    '''
     current_time = get_current_date()
 
     src_file_path = '运营情况1.xlsx'  # 源Excel文件路径
@@ -670,3 +837,5 @@ if __name__ == '__main__':
     cell_range = 'T5:T35'  # 单元格范围
 
     copy_first_sheet_to_all_sheets(src_file_path='表1.xlsx', dest_file_path='入库单.xlsx')
+    '''
+    copy_first_sheet_to_all_sheets(src_file_path='入库单\\入库单_2024年10月.xlsx', dest_file_path='入库单\\tt1.xlsx', sheet_i=2)

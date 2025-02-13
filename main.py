@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+
 from xl_class import *
 from gpt_api import AI_run, link_llm
 from gpt_data import llm_model2, llm_text2
@@ -9,6 +10,8 @@ import json
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+from maltipal_file_test import find_excel_files
+from auto_code import *
 
 
 def plot_chart(data, chart_type, x_column, y_columns=None, legend_title=None, title='Chart', xlabel=None, ylabel=None,
@@ -63,6 +66,34 @@ def save_list_to_txt(file_path, data_list):
             file.write(str(item) + '\n')  # 每个元素写入一行
 
 
+def check_path_type(path):
+    """
+    判断给定的路径是指向一个文件还是一个目录。
+    参数:path (str): 要检查的路径。
+    返回:str: 返回描述路径类型的字符串信息。
+    """
+    if os.path.isfile(path):
+        return 1    # 文件
+    elif os.path.isdir(path):
+        return 0    # 文件夹
+    else:
+        return 400
+
+
+def list_to_string(input_list, separator=', '):
+    """
+    将列表转换为字符串，支持包含任意类型的元素。
+    参数:input_list (list): 要转换的列表。
+        separator (str): 元素之间的分隔符，默认为', '。
+    返回:str: 转换后的字符串。
+    """
+    # 将列表中的每个元素转换为字符串
+    str_list = [str(element) for element in input_list]
+
+    # 使用指定的分隔符连接所有字符串元素
+    return separator.join(str_list)
+
+
 # 获取当前日期
 time_c = get_current_date()
 
@@ -75,15 +106,21 @@ st.title("Excel自动化AI工具")
 col3_1, col3_2 = st.columns([16, 1])
 
 with col3_1:
-    input_str = st.text_input("请输入你的Excel文件路径：")
+    input_str = st.text_input("请输入你的Excel文件路径（文件名或文件夹名）：")
     file_path = process_path_or_filename(input_str)
     # 检查文件是否存在
     exist_file = os.path.exists(file_path)
     if file_path:
         if exist_file:
-            pass
+            path_n = check_path_type(file_path)
+            if path_n == 1:
+                st.success(f"文件 '{file_path}' 存在！")
+            elif path_n == 0:
+                st.success(f"文件夹 '{file_path}' 存在！")
+                files_list = find_excel_files(file_path)
+                #st.write(files_list)
         else:
-            st.error(f"文件 '{file_path}' 不存在！请重新输入文件路径！")
+            st.error(f"文件或文件夹 '{file_path}' 不存在！请重新输入文件路径！")
 
 with col3_2:
     if file_path:
@@ -97,12 +134,12 @@ with tab1:
     col4_1, col4_2, col4_3 = st.columns([6, 8, 2])
     with col4_1:
         # 定义主流大语言模型列表
-        models1 = ["GLM-4-Air", "GLM-4-Flash", "Doubao-1.5-lite-32k", "Doubao-1.5-pro-32k", "deepseek-chat", "deepseek-reasoner", "deepseek-coder", "qwen-turbo-latest", "qwen-plus-latest", "qwen-coder-plus-latest"]
+        models1 = ["deepseek-v3-aliyun", "本地模型", "deepseek-r1-aliyun", "deepseek-v3-baiduyun", "deepseek-r1-baiduyun", "deepseek-v3-volcengine", "deepseek-r1-volcengine", "deepseek-chat", "deepseek-reasoner",  "GLM-4-Air", "GLM-4-Flash", "Doubao-1.5-lite-32k", "Doubao-1.5-pro-32k", "deepseek-reasoner", "deepseek-coder", "qwen-turbo-latest", "qwen-plus-latest", "qwen-coder-plus-latest"]
         # 创建下拉列表，默认选择 DeepSeek
-        selected_model = st.selectbox(
+        selected_model1 = st.selectbox(
             "选择一个大语言模型",
             models1,
-            index=models1.index("GLM-4-Air")  # 设置默认选项为 DeepSeek
+            index=models1.index("deepseek-v3-aliyun")  # 设置默认选项为 DeepSeek
         )
     with col4_2:
         API_key_1 = st.text_input("输入API密钥", type="password")
@@ -110,12 +147,22 @@ with tab1:
         st.markdown("[如何获得API密钥](https://apifox.com/apidoc/shared-0fd7ea54-919e-4c93-b673-c60219bc82e0/doc-4739665)", )
 
     query = st.text_area("请输入关于你上传文件路径下对该文件的文件的指令，或关于上传文件的需求：")
+    if file_path:
+        if exist_file:
+            if path_n == 0:
+                st.write(files_list)
+                query = query + "\n文件夹下有如下Excel文件:" + list_to_string(files_list)
+                #st.write(query)
+
 
     col1_1, col1_2 = st.columns([1, 2])
     with col1_1:
         button = st.button("执行任务")
     with col1_2:
-        checked = st.checkbox(f"复制 {file_path} 文件备份")
+        if file_path:
+            if exist_file:
+                if path_n == 1:
+                    checked = st.checkbox(f"复制 {file_path} 文件备份")
 
     if button:
         if not file_path:
@@ -129,13 +176,16 @@ with tab1:
         else:
             with st.spinner("AI思考中，请稍等..."):
                 time_tab_1_1 = time.time()
-                if checked:
-                    copy_excel_with_pandas(file_path)
+                if file_path:
+                    if exist_file:
+                        if path_n == 1:
+                            if checked:
+                                copy_excel_with_pandas(file_path)
                 try:
-                    text = AI_run(query, model=selected_model, API_key=API_key_1)
+                    text = AI_run(query, model=selected_model1, API_key=API_key_1)
                     resp = link_llm(text, file_path)
                     st.write(text)
-                    if resp!=text:
+                    if resp != text:
                         st.write(resp)
                     # 将生成的回答插入到历史记录的开头
                     st.session_state.history.insert(0, text)
@@ -206,7 +256,14 @@ with tab2:
                 st.warning("没有历史记录")
 
 
-def link_llm2(text):
+# 定义一个函数来尝试将列转换为 double 类型
+def try_convert_to_double(column):
+    try:
+        return pd.to_numeric(column)
+    except (ValueError, TypeError):
+        return column  # 如果转换失败，返回原始列
+
+def link_llm2(text, df=None):
     """
     将字符串用JSON进行解析，并运行JSON中的函数
     :param text:
@@ -214,59 +271,96 @@ def link_llm2(text):
     """
     # 正则表达式
     pattern = r'\{[^{}]*\{.*?\}[^{}]*\}'
+    pattern_python = r"(?<=```python\n)(.*?)(?=\n```)"
 
     # 使用正则表达式匹配
     match = re.findall(pattern, text)
     print(match)
+    match_python = re.findall(pattern_python, text, re.DOTALL)
+    print(match_python)
 
-    if match:
-        for i_n in match:
-            print(i_n)
-            try:
-                # 解析JSON数据
-                json_data = json.loads(i_n)
-                datas = json_data['def_name']
-            except:
-                print("解析JSON出错")
-            # 执行函数
-            data = datas[0]
-            try:
-                print(data)
-                exec(data)
-            except:
-                str_text = "不能执行此动作"
-                print(str_text)
-                return str_text
+    if match or match_python:
+        if match:
+            for i_n in match:
+                print(i_n)
+                try:
+                    # 解析JSON数据
+                    json_data = json.loads(i_n)
+                    datas = json_data['def_name']
+                except:
+                    print("解析JSON出错")
+                # 执行函数
+                data = datas[0]
+                try:
+                    print(data)
+                    exec(data)
+                except:
+                    str_text = "不能执行此动作"
+                    print(str_text)
+                    return str_text
+        else:
+            for i_n in match_python:
+                #print(i_n)
+                try:
+                    # 检查代码安全性
+                    if not check_code_safety(i_n):
+                        print("代码包含不允许的库，终止执行。")
+                        return "代码包含不允许的库，终止执行。"
+
+                    # 尝试将每一列转换为 double 类型
+                    #df_2 = df.apply(try_convert_to_double)
+
+                    if df is not None:
+                        output = run_generated_code(i_n, df=df)
+                    return output
+                except:
+                    print("程序出错。")
+                    return "程序出错。"
     else:
         return text
 
-
 # 数据分析Tab
 with tab3:
+    output_filename = 'output_default.xlsx'
     col5_1, col5_2, col5_3 = st.columns([6, 8, 2])
     with col5_1:
         # 定义主流大语言模型列表
-        models2 = ["abab7-chat-preview", "deepseek-coder", "deepseek-chat", "deepseek-reasoner", "qwen-max-latest", "GLM-4-Flash", "GLM-4-Plus", "Doubao-1.5-pro-256k"]
+        models2 = ["deepseek-v3-aliyun", "本地模型", "deepseek-r1-aliyun", "deepseek-v3-baiduyun", "deepseek-r1-baiduyun", "deepseek-v3-volcengine", "deepseek-r1-volcengine", "deepseek-chat", "deepseek-reasoner", "qwen-max-latest", "GLM-4-Flash", "GLM-4-Plus", "Doubao-1.5-pro-256k"]
         # 创建下拉列表，默认选择 DeepSeek
-        selected_model = st.selectbox(
+        selected_model2 = st.selectbox(
             "选择一个数据分析大语言模型",
             models2,
-            index=models2.index("abab7-chat-preview")  # 设置默认选项为 DeepSeek
+            index=models2.index("deepseek-v3-aliyun"),  # 设置默认选项
         )
     with col5_2:
         API_key_2 = st.text_input("输入数据分析大语言模型API密钥", type="password")
     with col5_3:
         st.markdown("[怎样获得API密钥](https://apifox.com/apidoc/shared-0fd7ea54-919e-4c93-b673-c60219bc82e0/doc-4739665)", )
 
-    data = st.file_uploader("上传你的Excel文件（xlsx格式）：", type="xlsx")
+    data = st.file_uploader("上传你的Excel文件（xlsx格式和图片格式）：", type=["xlsx", "png", "jpg", "jpeg"])
+
     if data:
-        st.session_state["df"] = pd.read_excel(data)
-        with st.expander("原始数据", expanded=True):
-            st.dataframe(st.session_state["df"])
+        if data.type in ["image/png", "image/jpg", "image/jpeg"]:
+            with st.expander("上传的图片", expanded=True):
+                # 显示上传的图片
+                st.image(data, caption="上传的图片")
+        else:
+            st.session_state["df"] = pd.read_excel(data)
+            df = pd.read_excel(data)
+            #table_md = df.to_markdown(index=False)
+
+            with st.expander("原始数据", expanded=True):
+                st.dataframe(st.session_state["df"])
+                #st.write(st.session_state["df"].to_markdown())
 
     query2 = st.text_area("请输入需求")
+
     if data:
-        text_2 = query2 + "数据如下" + st.session_state["df"].to_string()
+        if data.type in ["image/png", "image/jpg", "image/jpeg"]:
+            text_2 = query2
+        else:
+            text_2 = query2 + "数据如下" + st.session_state["df"].to_markdown()
+            #text_2 = query2 + f"以下是数据表格：\n{table_md}"
 
     col2_1, col2_2 = st.columns([1, 2])
     with col2_1:
@@ -283,15 +377,27 @@ with tab3:
             with st.spinner("AI思考中，请稍等..."):
                 time_tab_3_1 = time.time()
                 try:
-                    respose2 = llm_model2(text_2, selected_model, API_key_2)
-                    #respose2 = AI_run2(text_2)
+                    if data.type in ["image/png", "image/jpg", "image/jpeg"]:
+                        respose2 = llm_model2(text_2, selected_model2, API_key_2, data)
+                    else:
+                        respose2 = llm_model2(text_2, selected_model2, API_key_2)
                     text_t = llm_text2(respose2)
                     st.write(text_t)
-                    respose3 = link_llm2(text_t)
+                    if data.type in ["image/png", "image/jpg", "image/jpeg"]:
+                        respose3 = link_llm2(text_t)
+                    else:
+                        respose3 = link_llm2(text_t, df=df)
+
                     if respose3 != text_t:
                         st.write(respose3)
-                except:
-                    print("程序出错。")
+
+                except SyntaxError as e:
+                    output_e = f"SyntaxError: {e}"
+                    print("程序出错。", output_e)
+                    st.error("程序出错。")
+                except Exception as e:
+                    output_e = f"RuntimeError: {e}"
+                    print("程序出错。", output_e)
                     st.error("程序出错。")
                 time_tab_3_2 = time.time()
                 st.write("请求用时：", time_tab_3_2-time_tab_3_1, "秒")
